@@ -1,0 +1,132 @@
+name: Magisk Boot Patch Application
+
+on:
+  workflow_dispatch:
+    inputs:
+      romUrl:
+        description: 'Android ROM Url'
+        required: true
+        default: "https://dl.google.com/dl/android/aosp/oriole-ota-tp1a.221005.002-5e69c530.zip"
+        type: string
+      cpuAbi:
+        description: "CPU ABI"
+        required: true
+        default: "arm64-v8a"
+        type: choice
+        options:
+        - arm64-v8a
+        - armeabi-v7a
+        - x86_64
+        - x86
+      keepForceEncrypt:
+        description: 'KEEPFORCEENCRYPT'
+        default: true
+        type: boolean
+      keepVerity:
+        description: 'KEEPVERITY'
+        default: true
+        type: boolean
+      magiskUrl:
+        description: 'Custom Magisk Url'
+        type: string
+
+jobs:
+  getboot:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python 3.8
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.8
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get install axel brotli
+        python -m pip install --upgrade pip
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+    - uses: actions/checkout@v3
+      with:
+        path: payload_dumper
+        repository: vm03/payload_dumper
+
+    - name: Update update_metadata_pb2.py
+      run: |
+        curl -s https://android.googlesource.com/platform/system/update_engine/+/refs/heads/master/scripts/update_metadata_pb2.py?format=TEXT | base64 -d > payload_dumper/update_metadata_pb2.py
+
+    - name: Get boot
+      run: |
+        bash get_boot.sh
+      env:
+        ROM_URL: ${{ inputs.romUrl }}
+
+    - name: Upload build artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: vbmeta
+        path: out/img/**/vbmeta.img
+
+    - name: Upload build artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: boot
+        path: out/img/**/boot.img
+        if-no-files-found: error
+
+  magiskpatch:
+    needs: getboot
+
+    runs-on: macos-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: actions/download-artifact@v3
+      with:
+        name: 'boot'
+        path: boot
+
+    - name: Display structure of downloaded files
+      run: ls -R
+      working-directory: boot
+
+    - name: Set up Python 3.8
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.8
+
+    - name: Download Magisk
+      run: |
+        if [ -z $MAGISK_ASSET_URL ];then
+            LATEST_MAGISK_JSON=$(curl --fail --retry 3 -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/topjohnwu/Magisk/releases/latest)
+            MAGISK_ASSET_URL=$(echo "$LATEST_MAGISK_JSON" | jq -r '.assets[].browser_download_url | select(contains("stub")|not)')
+        fi
+        curl --silent --show-error --location --fail --retry 3 --output magisk.zip $MAGISK_ASSET_URL
+        unzip -q -o magisk.zip -d magisk
+      env:
+        MAGISK_ASSET_URL: ${{ inputs.magiskUrl }}
+
+    - name: Download avbtool
+      run: |
+        curl -s https://android.googlesource.com/platform/external/avb/+/refs/heads/master/avbtool.py?format=TEXT | base64 -d > avbtool.py
+        curl -s https://android.googlesource.com/platform/external/avb/+/refs/heads/master/test/data/testkey_rsa2048.pem?format=TEXT | base64 -d > testkey_rsa2048.pem
+        curl -s https://android.googlesource.com/platform/external/avb/+/refs/heads/master/test/data/testkey_rsa4096.pem?format=TEXT | base64 -d > testkey_rsa4096.pem
+        curl -s https://android.googlesource.com/platform/external/avb/+/refs/heads/master/test/data/testkey_rsa8192.pem?format=TEXT | base64 -d > testkey_rsa8192.pem
+
+    - name: Run magisk patch
+      uses: reactivecircus/android-emulator-runner@v2
+      with:
+        api-level: 29
+        script: ./magisk_patch.sh ${{ inputs.cpuAbi }} ${{ inputs.keepForceEncrypt }} ${{ inputs.keepVerity }}
+
+    - name: Upload build artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: magisk
+        path: boot/**/magisk-*.img
+        if-no-files-found: error
+

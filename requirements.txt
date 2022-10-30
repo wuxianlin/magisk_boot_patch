@@ -1,0 +1,4 @@
+bsdiff4
+protobuf==3.20.3
+pycryptodome
+docopt
