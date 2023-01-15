@@ -21,8 +21,6 @@ adb wait-for-device
 
 echo device found
 
-adb push magisk/lib/$CPU_ABI
-
 adb push magisk/lib/x86_64/libmagiskboot.so /data/local/tmp/magiskboot
 adb push magisk/lib/$CPU_ABI/libmagiskinit.so /data/local/tmp/magiskinit
 
@@ -56,7 +54,14 @@ for bootimage in `find imgs -name boot.img -o -name init_boot.img`;do
     bash resign.sh $bootdirname/$magiskbootname $bootimage
     adb shell /data/local/tmp/magiskboot cleanup
     adb shell ls /data/local/tmp/
-    adb shell rm /data/local/tmp/*
+    adb shell rm /data/local/tmp/*.img
+    adb shell rm /data/local/tmp/kernel
+    adb shell rm /data/local/tmp/kernel_dtb
+    adb shell rm /data/local/tmp/ramdisk.cpio
+    adb shell rm /data/local/tmp/second
+    adb shell rm /data/local/tmp/dtb
+    adb shell rm /data/local/tmp/extra
+    adb shell rm /data/local/tmp/recovery_dtbo
     echo stock boot
     python3 avbtool.py info_image  --image $bootimage
     echo magisk boot
