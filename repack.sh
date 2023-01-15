@@ -1,5 +1,7 @@
 #!/usr/bin/env sh
 
+export TERM=xterm
+
 for image in `find imgs -name recovery.img -o -name boot.img -o -name vendor_boot.img`;do
     imagedirname=`dirname $image`
     imagepartname=`basename $image`
