@@ -79,14 +79,16 @@ adb push magisk/assets/boot_patch.sh /data/local/tmp/
 adb shell chmod 755 /data/local/tmp/boot_patch.sh
 adb push magisk/assets/util_functions.sh /data/local/tmp/
 
-for bootimage in `find boot -name boot.img`;do
+for bootimage in `find boot -name boot.img -o -name init_boot.img`;do
     bootdirname=`dirname $bootimage`
+    bootpartname=`basename $bootimage`
+    bootpartname=${bootpartname%%.*}
     magiskbootname=magisk-$MAGISK_VER.img
     adb push $bootimage /data/local/tmp/boot.img
     adb shell KEEPFORCEENCRYPT=$KEEPFORCEENCRYPT KEEPVERITY=$KEEPVERITY sh /data/local/tmp/boot_patch.sh /data/local/tmp/boot.img
     adb pull /data/local/tmp/new-boot.img $bootdirname/$magiskbootname
     python3 avbtool.py erase_footer --image $bootdirname/$magiskbootname
-    python3 avbtool.py add_hash_footer --image $bootdirname/$magiskbootname --partition_size $(wc -c < $bootimage) --partition_name boot $(get_args $bootimage)
+    python3 avbtool.py add_hash_footer --image $bootdirname/$magiskbootname --partition_size $(wc -c < $bootimage) --partition_name $bootpartname $(get_args $bootimage)
     adb shell /data/local/tmp/magiskboot cleanup
     adb shell ls /data/local/tmp/
     adb shell rm /data/local/tmp/*

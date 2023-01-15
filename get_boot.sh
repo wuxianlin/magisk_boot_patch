@@ -36,7 +36,7 @@ mv
 
 mkdir -p $OUT/img
 
-for img in `find $OUT/rom -name boot.img -o -name vbmeta.img`;do
+for img in `find $OUT/rom -name boot.img -o -name init_boot.img -o -name vbmeta.img`;do
     imgpath=$(dirname $img)
     imgpath=${imgpath#$OUT/rom*}
     mkdir $OUT/img/$imgpath
