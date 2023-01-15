@@ -1,40 +1,5 @@
 #!/usr/bin/env sh
 
-
-get_args() {
-    python3 avbtool.py info_image --image $1>image_info
-
-    args=''
-
-    algorithm=`cat image_info|grep ^Algorithm:`
-    algorithm=${algorithm##* }
-    args=$args' --algorithm '${algorithm}
-    if [[ $algorithm =~ .*_RSA4096 ]]; then
-        args=$args' --key testkey_rsa4096.pem'
-    elif [[ $algorithm =~ .*_RSA2048 ]]; then
-        args=$args' --key testkey_rsa2048.pem'
-    elif [[ $algorithm =~ .*_RSA8192 ]]; then
-        args=$args' --key testkey_rsa8192.pem'
-    else
-        echo error
-    fi
-    hash_algorithm=`cat image_info|grep 'Hash Algorithm:'`
-    args=$args' --hash_algorithm '${hash_algorithm##* }
-    rollback_index=`cat image_info|grep '^Rollback Index:'`
-    args=$args' --rollback_index '${rollback_index##* }
-    rollback_index_location=`cat image_info|grep '^Rollback Index Location:'`
-    args=$args' --rollback_index_location '${rollback_index_location##* }
-    cat image_info|sed 's/ -> /:/g'|grep Prop: > props
-    for prop in `cat props|sed 's/Prop://g'|sed "s/'//g"`;do
-        args=$args' --prop '${prop}
-    done
-
-    rm image_info props
-
-    echo $args
-}
-
-
 CPU_ABI=$1
 KEEPFORCEENCRYPT=$2
 KEEPVERITY=$3
@@ -79,16 +44,16 @@ adb push magisk/assets/boot_patch.sh /data/local/tmp/
 adb shell chmod 755 /data/local/tmp/boot_patch.sh
 adb push magisk/assets/util_functions.sh /data/local/tmp/
 
-for bootimage in `find boot -name boot.img -o -name init_boot.img`;do
+for bootimage in `find imgs -name boot.img -o -name init_boot.img`;do
     bootdirname=`dirname $bootimage`
     bootpartname=`basename $bootimage`
     bootpartname=${bootpartname%%.*}
-    magiskbootname=magisk-$MAGISK_VER.img
+    magiskbootname=magisk-$bootpartname-$MAGISK_VER.img
     adb push $bootimage /data/local/tmp/boot.img
     adb shell KEEPFORCEENCRYPT=$KEEPFORCEENCRYPT KEEPVERITY=$KEEPVERITY sh /data/local/tmp/boot_patch.sh /data/local/tmp/boot.img
     adb pull /data/local/tmp/new-boot.img $bootdirname/$magiskbootname
     python3 avbtool.py erase_footer --image $bootdirname/$magiskbootname
-    python3 avbtool.py add_hash_footer --image $bootdirname/$magiskbootname --partition_size $(wc -c < $bootimage) --partition_name $bootpartname $(get_args $bootimage)
+    bash resign.sh $bootdirname/$magiskbootname $bootimage
     adb shell /data/local/tmp/magiskboot cleanup
     adb shell ls /data/local/tmp/
     adb shell rm /data/local/tmp/*

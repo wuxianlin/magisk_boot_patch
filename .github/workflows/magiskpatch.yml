@@ -67,14 +67,8 @@ jobs:
     - name: Upload build artifact
       uses: actions/upload-artifact@v3
       with:
-        name: vbmeta
-        path: out/img/**/vbmeta.img
-
-    - name: Upload build artifact
-      uses: actions/upload-artifact@v3
-      with:
-        name: boot
-        path: out/img/**/boot.img
+        name: imgs
+        path: out/img/**/*.img
         if-no-files-found: error
 
   magiskpatch:
@@ -87,12 +81,12 @@ jobs:
 
     - uses: actions/download-artifact@v3
       with:
-        name: 'boot'
-        path: boot
+        name: 'imgs'
+        path: imgs
 
     - name: Display structure of downloaded files
       run: ls -R
-      working-directory: boot
+      working-directory: imgs
 
     - name: Set up Python 3.8
       uses: actions/setup-python@v2
@@ -127,6 +121,22 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: magisk
-        path: boot/**/magisk-*.img
+        path: imgs/**/magisk-*.img
+        if-no-files-found: error
+
+    - name: Download Android Image Kitchen
+      run: |
+        curl --silent --show-error --location --fail --retry 3 --output AIK-Linux-v3.8-ALL.tar.gz "https://forum.xda-developers.com/attachments/aik-linux-v3-8-all-tar-gz.5300923/"
+        tar -xzf  AIK-Linux-v3.8-ALL.tar.gz
+
+    - name: Run repack
+      run: |
+        bash repack.sh
+
+    - name: Upload build artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: repack
+        path: imgs/**/*-repack.img
         if-no-files-found: error
 
